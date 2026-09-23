@@ -176,6 +176,17 @@ public class NetworkCutter {
 				if (link.getAllowedModes().contains(mode) && !subNetwork.getLinks().containsKey(link.getId())) {
 					Set<String> updated = new HashSet<>(link.getAllowedModes());
 					updated.remove(mode);
+					if (link.getAllowedModes().size() == 1) {
+						log.warn(
+							"Removing the last transport mode from link {}. "
+							+ "Removed mode: {}. Original modes: {}. "
+							+ "Remaining modes: {}.",
+							link.getId(),
+							mode,
+							link.getAllowedModes(),
+							updated
+						);
+					}
 					link.setAllowedModes(updated);
 				}
 			}
