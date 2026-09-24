@@ -159,6 +159,20 @@ public class RunScenarioCutter {
 		Network network = scenario.getNetwork();
 		networkCutter.run(network, modes);
 		networkCutter.keepLargestConnectedPartPerMode(network, modes);
+		RoadNetwork cleanedRoadNetwork =
+        new RoadNetwork(network, modes);
+
+		// Reassign outside activities whose original links are
+		// no longer available in the cleaned road network.
+
+		OutsideActivityAdapter cleanedOutsideActivityAdapter =
+				new OutsideActivityAdapter(cleanedRoadNetwork);
+
+		cleanedOutsideActivityAdapter.run(
+				scenario.getPopulation(),
+				scenario.getActivityFacilities()
+		);
+
 
 		// "Cut" config
 		// (we need to reload it, because it has become locked at this point)
