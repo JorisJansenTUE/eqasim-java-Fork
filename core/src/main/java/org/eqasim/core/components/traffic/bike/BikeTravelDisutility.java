@@ -23,10 +23,14 @@ public class BikeTravelDisutility implements TravelDisutility {
     @Override
     public double getLinkTravelDisutility(Link link, double v, Person person, Vehicle vehicle) {
         double travelTime = travelTimeCalculator.getLinkTravelTime(link, v, person, vehicle);
-        double linkTypeDisutility = BikeDisutilities.linkTypeDisutility(link, travelTime);
+        //double linkTypeDisutility = BikeDisutilities.linkTypeDisutility(link, travelTime); => made obsolete by new infrastructure disutility for Locarno
+        double infrastructureDisutility = BikeDisutilities.infrastructureDisutility(link, travelTime);
         double gradientDisutility = BikeDisutilities.gradientDisutility(link, travelTime);
-        double distanceDisutility = BikeDisutilities.distanceDisutility(link, travelTime);
-        double disutility = travelTime +linkTypeDisutility + gradientDisutility + distanceDisutility;
+        //double distanceDisutility = BikeDisutilities.distanceDisutility(link, travelTime);
+
+        //double disutility = travelTime +linkTypeDisutility + gradientDisutility + distanceDisutility;
+        double disutility = travelTime + infrastructureDisutility + gradientDisutility;
+        
         // add randomness
         double noise = sigmaNoise * random.nextGaussian();
 
