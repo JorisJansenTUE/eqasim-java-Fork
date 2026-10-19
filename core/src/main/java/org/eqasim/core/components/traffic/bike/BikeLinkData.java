@@ -29,9 +29,16 @@ public final class BikeLinkData {
             if (positions != null) positions.put(link.getId().index(), index);
             int offset = STRIDE * index;
             values[offset] = (float) BikeGradientBasedLinkSpeedCalculator.slopeSpeed(link);
-            values[offset + 1] = (float) (1.0 + BikeDisutilities.linkTypeDisutility(link, 1.0)
-                    + BikeDisutilities.gradientDisutility(link, 1.0));
-            values[offset + 2] = (float) BikeDisutilities.distanceDisutility(link, 0.0);
+            values[offset + 1] = (float) (1.0 + BikeDisutilities.infrastructureDisutility(link, 1.0)
+             + BikeDisutilities.gradientDisutility(link, 1.0)
+            );
+            // No additional distance-based disutility
+            values[offset + 2] = 0.0f;
+
+            // Not used in Locarno sim, as custom bike utility is used instead of the default utility
+            //values[offset + 1] = (float) (1.0 + BikeDisutilities.linkTypeDisutility(link, 1.0)
+            //        + BikeDisutilities.gradientDisutility(link, 1.0));
+            //values[offset + 2] = (float) BikeDisutilities.distanceDisutility(link, 0.0);
         }
     }
 
@@ -52,8 +59,11 @@ public final class BikeLinkData {
         if (offset >= 0 && values[offset] != 0) {
             return values[offset + 1] * travelTime + values[offset + 2];
         }
-        return travelTime + BikeDisutilities.linkTypeDisutility(link, travelTime)
-                + BikeDisutilities.gradientDisutility(link, travelTime)
-                + BikeDisutilities.distanceDisutility(link, travelTime);
+
+        return travelTime + BikeDisutilities.infrastructureDisutility(link, travelTime)
+                + BikeDisutilities.gradientDisutility(link, travelTime);
+        //return travelTime + BikeDisutilities.linkTypeDisutility(link, travelTime)
+        //        + BikeDisutilities.gradientDisutility(link, travelTime)
+        //        + BikeDisutilities.distanceDisutility(link, travelTime);
     }
 }

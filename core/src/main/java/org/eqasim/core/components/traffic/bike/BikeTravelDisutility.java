@@ -31,24 +31,34 @@ public class BikeTravelDisutility implements TravelTimeAwareDisutility {
         return travelTimeCalculator;
     }
 
+
     @Override
     public double getLinkTravelDisutility(Link link, double v, Person person, Vehicle vehicle) {
         double travelTime = travelTimeCalculator.getLinkTravelTime(link, v, person, vehicle);
         return getLinkTravelDisutility(link, v, person, vehicle, travelTime);
     }
 
+   
     @Override
-    public double getLinkTravelDisutility(Link link, double time, Person person, Vehicle vehicle, double travelTime) {
+    public double getLinkTravelDisutility(
+            Link link, double time, Person person,
+            Vehicle vehicle, double travelTime) {
+        // Edit the disutility calculation for locanro to use infrastructure penalties, 
         double disutility = linkData == null
-                ? travelTime + BikeDisutilities.linkTypeDisutility(link, travelTime)
+                ? travelTime
+                    + BikeDisutilities.infrastructureDisutility(link, travelTime)
                     + BikeDisutilities.gradientDisutility(link, travelTime)
-                    + BikeDisutilities.distanceDisutility(link, travelTime)
+                    //+ BikeDisutilities.distanceDisutility(link, travelTime) + BikeDisutilities.linkTypeDisutility(link, travelTime) -> Not used in Locarno sim
                 : linkData.disutility(link, travelTime);
-        // add randomness
+
+        // Add randomness
         double noise = sigmaNoise * random.nextGaussian();
 
         return disutility * (1.0 + noise);
     }
+
+
+    
 
     @Override
     public double getLinkMinimumTravelDisutility(Link link) {

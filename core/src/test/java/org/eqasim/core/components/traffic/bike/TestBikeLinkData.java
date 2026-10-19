@@ -17,32 +17,118 @@ import org.matsim.vehicles.VehicleUtils;
 import static org.junit.Assert.*;
 
 public class TestBikeLinkData {
-    @Test public void cachedSlopeAndCostsMatchExistingFormulaAcrossRoadTypesAndGradients() {
+    
+    @Test
+    public void cachedSlopeAndCostsMatchLocarnoFormulaAcrossInfrastructureAndSpeeds() {
         var network = NetworkUtils.createNetwork();
-        String[] types = {"primary", "secondary", "motorway", "cycleway", "unknown"};
+
+        // Road types, including the custom separated infrastructure
+        // and bicycle street.
+        String[] types = {"primary","secondary","motorway","cycleway","bike_suited","unknown","cyclestreet"};
+
+        // Different road gradients
         double[] grades = {-12, 0, 2.1, 5.1, 10.1, 20};
-        for (String type : types) for (double grade : grades) {
-            var link = link(network, type + grade, grade);
-            link.getAttributes().putAttribute("osm:way:highway", type);
+
+        // Speed limits in km/h, including the 30 km/h threshold
+        double[] speeds = {20, 30, 31, 50};
+
+        int id = 0;
+
+        // Create links for all combinations
+        for (String type : types) {
+            for (double grade : grades) {
+                for (double speed : speeds) {
+                    var link = link(network, "test-" + id++, grade);
+
+                    // Bicycle streets use a separate attribute
+                    if ("cyclestreet".equals(type)) {
+                        link.getAttributes().putAttribute(
+                                "osm:way:highway", "residential");
+                        link.getAttributes().putAttribute(
+                                "cyclestreet", true);
+                    } else {
+                        link.getAttributes().putAttribute(
+                                "osm:way:highway", type);
+                    }
+
+                    // MATSim stores free speed in m/s
+                    link.setFreespeed(speed / 3.6);
+                }
+            }
         }
+
         var data = new BikeLinkData(network);
+
+        // Check cached values against the Locarno formula
         for (Link link : network.getLinks().values()) {
-            assertEquals(BikeGradientBasedLinkSpeedCalculator.slopeSpeed(link), data.slopeSpeed(link), 5e-7);
+
+            // Check cached slope speed
+            assertEquals(
+                    BikeGradientBasedLinkSpeedCalculator.slopeSpeed(link),
+                    data.slopeSpeed(link),
+                    5e-7
+            );
+
+            String highway = BikeDisutilities.getLinkType(link);
+            boolean cyclestreet = Boolean.TRUE.equals(
+                    link.getAttributes().getAttribute("cyclestreet"));
+
+            // Expected VTT based on infrastructure classification
+            double expectedVtt;
+
+            if ("cycleway".equals(highway)
+                    || "bike_suited".equals(highway)) {
+                expectedVtt = 0.862;
+            } else if (cyclestreet) {
+                expectedVtt = 0.956;
+            } else if (link.getFreespeed() <= 30.0 / 3.6) {
+                expectedVtt = 1.085;
+            } else {
+                expectedVtt = 1.233;
+            }
+
+            // Test different travel times
             for (double time : new double[]{0, 10, 1000}) {
-                double expected = time + BikeDisutilities.linkTypeDisutility(link, time)
-                        + BikeDisutilities.gradientDisutility(link, time)
-                        + BikeDisutilities.distanceDisutility(link, time);
+
+                double expectedInfrastructure =
+                        time * (expectedVtt / 0.862 - 1.0);
+
+                double expected = time
+                        + expectedInfrastructure
+                        + BikeDisutilities.gradientDisutility(link, time);
+
                 assertEquals(expected, data.disutility(link, time), 2e-4);
             }
         }
-        // An independently prepared small network exercises sparse global link IDs.
+
+        // Test fallback for a link outside the cached network
         var sparse = NetworkUtils.createNetwork();
         var other = link(sparse, "sparse-last", 6);
+        other.setFreespeed(50.0 / 3.6);
+
         var sparseData = new BikeLinkData(sparse);
-        assertEquals(BikeGradientBasedLinkSpeedCalculator.slopeSpeed(other), sparseData.slopeSpeed(other), 5e-7);
-        assertEquals(0, new BikeLinkData(NetworkUtils.createNetwork()).disutility(other, 0)
-                - BikeDisutilities.distanceDisutility(other, 0), 0);
+
+        assertEquals(
+                BikeGradientBasedLinkSpeedCalculator.slopeSpeed(other),
+                sparseData.slopeSpeed(other),
+                5e-7
+        );
+
+        double travelTime = 20.0;
+
+        double expected = travelTime
+                + BikeDisutilities.infrastructureDisutility(other, travelTime)
+                + BikeDisutilities.gradientDisutility(other, travelTime);
+
+        assertEquals(
+                expected,
+                new BikeLinkData(NetworkUtils.createNetwork())
+                        .disutility(other, travelTime),
+                1e-9
+        );
     }
+
+
 
     @Test public void staticSnapshotDoesNotFreezeDelaysOrSpeedLimits() {
         var network = NetworkUtils.createNetwork();
@@ -50,22 +136,32 @@ public class TestBikeLinkData {
         var data = new BikeLinkData(network);
         var calculator = new BikeGradientBasedLinkSpeedCalculator((l, t, id) -> t / 10, data);
         var time = new BikeTravelTime(calculator);
+
         double base = link.getLength() / data.slopeSpeed(link);
         assertEquals(base + 5, time.getLinkTravelTime(link, 100, null, null), 1e-9);
         assertEquals(base + 10, time.getLinkTravelTime(link, 200, null, null), 1e-9);
+
         link.setFreespeed(2.5);
         assertEquals(40, time.getLinkTravelTime(link, 200, null, null), 0);
+
         link.setFreespeed(100);
         var type = VehicleUtils.createVehicleType(Id.createVehicleTypeId("limited"));
         type.setMaximumVelocity(4);
         var vehicle = VehicleUtils.createVehicle(Id.createVehicleId("limited"), type);
         assertEquals(35, time.getLinkTravelTime(link, 200, null, vehicle), 1e-9);
-        // Geometry/road type are a snapshot; no attribute or slope work on lookup.
+
+        // Record cached values before modifying the link
+        double originalDisutility = data.disutility(link, 10);
+        double originalSlopeSpeed = data.slopeSpeed(link);
+
+        // Modify geometry and road type after creating the cache
         link.getToNode().setCoord(new Coord(100, 0, 150));
         link.getAttributes().putAttribute("osm:way:highway", "motorway");
-        assertEquals((float) 5.9, data.slopeSpeed(link), 0);
-        assertEquals(30, data.disutility(link, 10), 1e-6);
-    }
+
+        // Cached values should remain unchanged
+        assertEquals(originalSlopeSpeed, data.slopeSpeed(link), 0);
+        assertEquals(originalDisutility, data.disutility(link, 10), 1e-6);
+}
 
     @Test public void floatCostsKeepTheSameGaussianDrawSequenceAndFastPathDoesNotQueryTimeAgain() {
         var network = NetworkUtils.createNetwork();
