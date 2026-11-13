@@ -29,7 +29,7 @@ public class TollsModule extends AbstractModule {
             EqasimTollsTravelDisutilityFactory tollFactory) {
         
         // Penalties are place holders and could be altered
-        double destinationPenaltyPerMeter = 0.2;
+        double destinationPenaltyPerMeter = 1;
         double cyclestreetPenaltyPerMeter = 0.0; 
 
         return new LocarnoRoadTravelDisutilityFactory(
