@@ -13,11 +13,13 @@ public class BikeDisutilities {
     }
 
     //Values take from the Dutch New values of Travel time and Comfort. (https://english.kimnet.nl/documents/2024/04/03/new-values-of-travel-time-reliability-and-comfort-in-the-netherlands)
-    private static final double REFERENCE_VTT = 0.862;
-    private static final double INDEPENDENT_PATH_VTT = 0.862;
-    private static final double CYCLESTREET_VTT = 0.956;
-    private static final double MIXED_30_VTT = 1.085;
-    private static final double MIXED_50_VTT = 1.233;
+    //Values are calibrated to PBL as reference, mixed traffic is assumed to be high unless it is a destination road.
+    private static final double REFERENCE_VTT = 1;
+    private static final double INDEPENDENT_PATH_VTT = 1;
+    private static final double CYCLESTREET_VTT = 1.272;
+    private static final double MIXED_30_VTT = 1.434;
+    private static final double MIXED_50_VTT = 1.629;
+    private static final double DESTINATION_VTT = 1.188;
 
     public static double infrastructureDisutility(
             Link link,
@@ -30,6 +32,10 @@ public class BikeDisutilities {
                 link.getAttributes().getAttribute("cyclestreet")
         );
 
+        boolean destinationroad = Boolean.TRUE.equals(
+                link.getAttributes().getAttribute("destination_road")
+        );
+
         double vtt;
 
         if ("cycleway".equals(highway)
@@ -40,6 +46,10 @@ public class BikeDisutilities {
         } else if (cyclestreet) {
 
             vtt = CYCLESTREET_VTT;
+
+        } else if (destinationroad) {
+
+            vtt = DESTINATION_VTT;
 
         } else {
 
